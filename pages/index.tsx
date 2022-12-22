@@ -2,6 +2,7 @@ import Head from "next/head";
 import { Inter } from "@next/font/google";
 import styles from "../styles/Home.module.css";
 import { useEffect, useState } from "react";
+import { type } from "os";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -13,31 +14,45 @@ export default function Home() {
     const url = `${base}&sheet=${sheetName}&tq=${query}`;
     const [message, setMessage] = useState<string>();
 
-    const getData = () => {
+    const getData = async () => {
+        return new Promise((resolve, reject) => {
+            fetch(url)
+                .then(async (res) => {
+                    if (res) {
+                        const data: string = await res.text();
+                        return data;
+                    }
+                    reject(
+                        `No he podido recuperar los datos. Codigo de error: ${res.status}`
+                    );
+                })
+                .then((rep) => {
+                    resolve(rep);
+                });
+        });
+    };
+
+    const processData = async () => {
         const excercices: string[][] = [];
         let actualDay: string[] = [];
-        fetch(url)
-            .then((res) => res.text())
-            .then((rep) => {
-                const minData = JSON.parse(
-                    rep.substring(47).slice(0, -2)
-                ).table.rows.slice(8);
-                minData.filter((x: any, index: number) => {
-                    const field = x.c[2]?.v;
-                    if (field.includes("Ejercicio")) {
-                        excercices.push(actualDay);
-                        actualDay = [];
-                    } else if (field !== "Registro") {
-                        actualDay.push(field);
-                        if (index === minData.length - 1) {
-                            excercices.push(actualDay);
-                        }
-                    }
-                });
-                return excercices;
-            });
 
-        return excercices;
+        const data = await getData();
+        const { table } = JSON.parse(data.substring(47).slice(0, -2));
+        const name = table.rows[1].c[4].v;
+        const minData = table.rows.slice(8);
+        minData.filter((x: any, index: number) => {
+            const field = x.c[2]?.v;
+            if (field.includes("Ejercicio")) {
+                excercices.push(actualDay);
+                actualDay = [];
+            } else if (field !== "Registro") {
+                actualDay.push(field);
+                if (index === minData.length - 1) {
+                    excercices.push(actualDay);
+                }
+            }
+        });
+        return;
     };
 
     return (
@@ -55,7 +70,7 @@ export default function Home() {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
             <main className={styles.main}>
-                <button onClick={getData}>GET DATA</button>
+                <button onClick={processData}>GET DATA</button>
                 {message ? <p>{message}</p> : null}
             </main>
         </>
