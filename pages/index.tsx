@@ -14,7 +14,7 @@ export default function Home() {
     const url = `${base}&sheet=${sheetName}&tq=${query}`;
     const [message, setMessage] = useState<string>();
 
-    const getData = async () => {
+    const getDataOfPlan = async () => {
         return new Promise((resolve, reject) => {
             fetch(url)
                 .then(async (res) => {
@@ -30,6 +30,40 @@ export default function Home() {
                     resolve(rep);
                 });
         });
+    };
+
+
+    /* Videos */
+    const getDataOfVideos = async () => {
+        const URL_VIDEOS =
+            "https://docs.google.com/spreadsheets/d/1v2O32EqUEzuFbUzruf1xGoo2mNCrhsQXu7f_it7u_Gs/gviz/tq?";
+        return new Promise((resolve, reject) => {
+            fetch(URL_VIDEOS)
+                .then(async (res) => {
+                    if (res) {
+                        const data: string = await res.text();
+                        return data;
+                    }
+                    reject(
+                        `No he podido recuperar los datos. Codigo de error: ${res.status}`
+                    );
+                })
+                .then((rep) => {
+                    resolve(rep);
+                });
+        });
+    };
+
+    const processDataOfVideos = async (excercice: string) => {
+        const data = await getDataOfVideos();
+        const { table } = JSON.parse(data.substring(47).slice(0, -2));
+        const minData = table.rows.slice(1);
+        const videoFounded = minData.find((row: any) => {
+            if (row.c[0].v === excercice) {
+                return true;
+            }
+        });
+        return videoFounded.c[1].v;
     };
 
     const processData = async () => {
@@ -52,7 +86,20 @@ export default function Home() {
                 }
             }
         });
-        return;
+        return {
+            name,
+            excercices,
+        };
+    };
+
+    const generateMessage = async () => {
+        const messageProcessed = "";
+        const { excercices, name } = await processData();
+        excercices.map((dayComplete: string[], index: number) => {
+            const partOfMessage = `Dia${index + 1}: \n`;
+            dayComplete.map((excercice: string) => {});
+        });
+        console.log(excercices);
     };
 
     return (
@@ -70,7 +117,13 @@ export default function Home() {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
             <main className={styles.main}>
-                <button onClick={processData}>GET DATA</button>
+                <button
+                    onClick={() => {
+                        processDataOfVideos("Step Up");
+                    }}
+                >
+                    GET DATA
+                </button>
                 {message ? <p>{message}</p> : null}
             </main>
         </>
