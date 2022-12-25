@@ -8,20 +8,50 @@ const inter = Inter({ subsets: ["latin"] });
 
 export default function Home() {
     const sheetId: string = "1TW41_iMkvCvsqjedB7XLEUiP8uUGnAJp";
-    const base = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?`;
+    const url_plan = `https://docs.google.com/spreadsheets/d/${sheetId}`;
+    const base = `${url_plan}/gviz/tq?`;
     const sheetName = "Plan";
     const query = encodeURIComponent("Select *");
     const url = `${base}&sheet=${sheetName}&tq=${query}`;
-    const [message, setMessage] = useState<string>();
-    const [videoData, setVideoData] = useState<any>();
+    const [videosJson, setVideosJson] =
+        useState<{ name: string; url: string }[]>();
 
-    const getDataOfPlan = async () => {
+    const processData = (data: []) => {
+        const excercices: string[][] = [];
+        let actualDay: string[] = [];
+        data.filter((x: any, index: number) => {
+            const field = x.c[2]?.v;
+            if (field.includes("Ejercicio")) {
+                excercices.push(actualDay);
+                actualDay = [];
+            } else if (field !== "Registro") {
+                actualDay.push(field);
+                if (index === data.length - 1) {
+                    excercices.push(actualDay);
+                }
+            }
+        });
+        return excercices;
+    };
+    const getDataOfPlan = async (): Promise<{
+        name: string;
+        excercices: [];
+    }> => {
         return new Promise((resolve, reject) => {
             fetch(url)
-                .then(async (res) => {
+                .then(async (res: any) => {
                     if (res) {
                         const data: string = await res.text();
-                        return data;
+                        const { table } = JSON.parse(
+                            data.substring(47).slice(0, -2)
+                        );
+                        const name = table.rows[1].c[4].v;
+                        const minData = table.rows.slice(8);
+                        const excercices = processData(minData);
+                        return {
+                            name,
+                            excercices,
+                        };
                     }
                     reject(
                         `No he podido recuperar los datos. Codigo de error: ${res.status}`
@@ -42,7 +72,21 @@ export default function Home() {
                 .then(async (res) => {
                     if (res) {
                         const data: string = await res.text();
-                        setVideoData(data);
+                        const { table } = JSON.parse(
+                            data.substring(47).slice(0, -2)
+                        );
+                        const minData = table.rows.slice(1);
+                        const videoDataJson = minData.map((row: any) => {
+                            return {
+                                name: row.c[0].v
+                                    .toLowerCase()
+                                    .normalize("NFD")
+                                    .replace(/[\u0300-\u036f]/g, ""),
+                                url: row.c[1].v,
+                            };
+                        });
+                        setVideosJson(videoDataJson);
+                        return videoDataJson;
                     }
                     reject(
                         `No he podido recuperar los datos. Codigo de error: ${res.status}`
@@ -55,50 +99,20 @@ export default function Home() {
     };
 
     const processDataOfVideos = (excercice: string) => {
-        if (videoData) {
-            const data = videoData;
-            const { table } = JSON.parse(data.substring(47).slice(0, -2));
-            const minData = table.rows.slice(1);
-            const videoFounded = minData.find((row: any) => {
-                if (row.c[0].v === excercice) {
-                    return true;
-                }
-            });
-            return videoFounded ? videoFounded.c[1].v : false;
-        } else {
-            return false;
-        }
-    };
-
-    const processData = async () => {
-        const excercices: string[][] = [];
-        let actualDay: string[] = [];
-
-        const data = await getDataOfPlan();
-        const { table } = JSON.parse(data.substring(47).slice(0, -2));
-        const name = table.rows[1].c[4].v;
-        const minData = table.rows.slice(8);
-        minData.filter((x: any, index: number) => {
-            const field = x.c[2]?.v;
-            if (field.includes("Ejercicio")) {
-                excercices.push(actualDay);
-                actualDay = [];
-            } else if (field !== "Registro") {
-                actualDay.push(field);
-                if (index === minData.length - 1) {
-                    excercices.push(actualDay);
-                }
-            }
-        });
-        return {
-            name,
-            excercices,
-        };
+        const dataExcercice = videosJson?.find(
+            (x: any) =>
+                x.name ===
+                excercice
+                    .toLowerCase()
+                    .normalize("NFD")
+                    .replace(/[\u0300-\u036f]/g, "")
+        );
+        return dataExcercice ? dataExcercice.url : false;
     };
 
     const generateMessage = async () => {
-        let messageProcessed = "";
-        const { excercices, name } = await processData();
+        const { excercices, name } = await getDataOfPlan();
+        let messageProcessed = `${name}\nPlan: ${url_plan}\n\n`;
         excercices.map(
             (dayComplete: string[], indexOfDay: number, rowOfDay) => {
                 let partOfMessage = `Dia${indexOfDay + 1}: \n`;
@@ -149,14 +163,19 @@ export default function Home() {
                 <link rel="icon" href="/favicon.ico" />
             </Head>
             <main className={styles.main}>
-                <button
-                    onClick={() => {
-                        generateMessage();
-                    }}
-                >
-                    GET DATA
-                </button>
-                {message ? <p>{message}</p> : null}
+                {videosJson ? (
+                    <button
+                        onClick={() => {
+                            generateMessage();
+                        }}
+                    >
+                        GET DATA
+                    </button>
+                ) : (
+                    <span>Loading ...</span>
+                )}
+
+                {/* {message ? <p>{message}</p> : null} */}
             </main>
         </>
     );
